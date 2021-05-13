@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+import math
 from whaaaaat import prompt, print_json
 
 
@@ -8,10 +9,10 @@ VAX_SPOT = "Vaccination Spot"
 QUARANTINE = "Quarantine Center"
 NOTHING = "Nothing"
 
-#index 0 = Playground, index 1 = Vaccination Spot, index 2 = Quarantine Center, index 3 = Nothing
-uintToLocationList = [PLAYGROUND, VAX_SPOT, QUARANTINE, NOTHING]
-#maps the long form name of a location to its index
-locationToUintDict = dict([(PLAYGROUND, 0), (VAX_SPOT, 1), (QUARANTINE, 2), (NOTHING, 3)])
+#index 0 = Quarantine Center, index 1 = Nothing, index 2 = Vaccination Spot, index 3 = Playground
+uintToLocationList = [QUARANTINE, NOTHING, VAX_SPOT, PLAYGROUND]
+#maps the long form name of a location to its index in the above list as well as its edge score
+locationToUintDict = dict([(PLAYGROUND, 3), (VAX_SPOT, 2), (QUARANTINE, 0), (NOTHING, 1)])
 
 #Credit: Paul Manta https://stackoverflow.com/questions/31875/is-there-a-simple-elegant-way-to-define-singletons
 class PointSingleton:
@@ -79,13 +80,19 @@ class Point:
 class Edge:
     def __init__(self, point1, point2):
         self._point1, self._point2 = point2, point2
-        self._score = 0
+        self._score = None
     
     def __str__(self):
         return "{} <-> {}".format(self._point1, self._point2)
 
     def add_score(self, scoreToAdd):
-        self._score += scoreToAdd
+        if self._score is None:
+            self._score = scoreToAdd
+        #two playgrounds next to each other --> edge value is infinity
+        elif self.score == 3 and scoreToAdd == 3:
+            self._score = math.inf
+        else:
+            self._score = (self._score + scoreToAdd)/2
 
     def get_score(self):
         return self._score
@@ -101,7 +108,6 @@ class GridItem:
 
     def initialize_edges(self):
         edge = Edge.instance(self._top_left, self._top_right)
-        #TODO: need to actually get score from dict instead of this
         edge.add_score(self._value)
         edge = Edge.instance(self._top_right, self._bottom_right)
         edge.add_score(self._value)
@@ -109,8 +115,6 @@ class GridItem:
         edge.add_score(self._value)
         edge = Edge.instance(self._top_left, self._bottom_left)
         edge.add_score(self._value)
-
-        #TODO: when an edge passes by two playgrounds --> make score infinity
 
 def askQuestions(num_rows, num_cols):
     table = np.zeros((num_rows, num_cols), dtype=object)
@@ -120,12 +124,7 @@ def askQuestions(num_rows, num_cols):
                 "type": "list",
                 "name": "entry",
                 "message": f"What do you want to enter at row {row}, column {col}?",
-                "choices": [
-                    PLAYGROUND,
-                    VAX_SPOT,
-                    QUARANTINE,
-                    NOTHING
-                ]
+                "choices": [QUARANTINE, NOTHING, VAX_SPOT, PLAYGROUND]
             }]
             answer = prompt(question)
             table[row, col] = GridItem(locationToUintDict[answer["entry"]], row, col)
