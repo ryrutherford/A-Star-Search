@@ -119,10 +119,10 @@ class Edge:
 class GridItem:
     def __init__(self, uintValue, row, column):
         self._value = uintValue
-        self._top_left = Point.instance(row, column)
-        self._top_right = Point.instance(row, column + 1)
-        self._bottom_left = Point.instance(row + 1, column)
-        self._bottom_right = Point.instance(row + 1, column + 1)
+        self._top_left = Point.instance(column, row)
+        self._top_right = Point.instance(column + 1, row)
+        self._bottom_left = Point.instance(column, row + 1)
+        self._bottom_right = Point.instance(column + 1, row + 1)
         self.initialize_edges()
     
     def get_points(self):
@@ -141,7 +141,7 @@ class GridItem:
         edge = Edge.instance(self._top_left, self._bottom_left)
         edge.add_score(self._value)
 
-def askQuestions(num_rows, num_cols):
+def askInitQuestions(num_rows, num_cols):
     table = np.zeros((num_rows, num_cols), dtype=object)
     for row in range(num_rows):
         for col in range(num_cols):
@@ -154,6 +154,43 @@ def askQuestions(num_rows, num_cols):
             answer = prompt(question)
             table[row, col] = GridItem(location_to_uint_dict[answer["entry"]], row, col)
     return table
+
+def validStartingPoint(x, y, num_rows, num_cols):
+    try:
+        x = float(x)
+        y = float(y)
+    except ValueError:
+        print("ValueError, at least one of x or y was not a float or integer")
+        return False
+    if x > num_cols or y > num_rows or x < 0 or y < 0:
+        print(f"The coordinates ({x}, {y}) you entered are not in the grid! Please try again")
+        return False
+    return True
+
+def askPlacementQuestions(num_rows, num_cols):
+    print("You must enter values for the x and y coordinates of the start position")
+    while True:
+        question = [
+        {
+            'type': 'input',
+            'name': 'x',
+            'message': f'Enter a value for x (accepted range: [0 - {num_cols}])',
+        },
+        {
+            'type': 'input',
+            'name': 'y',
+            'message': f'Enter a value for y (accepted range: [0 - {num_rows}])',
+        }
+        ]
+        answer = prompt(question)
+        x = answer["x"]
+        y = answer["y"]
+        if validStartingPoint(x, y, num_rows, num_cols):
+            x = math.ceil(float(x))
+            y = math.floor(float(y))
+            break
+    print(f"Nice! Role C will be starting at point ({x},{y})")
+    return x, y
 
 def wrap_location_code_in_color(code):
     return location_code_to_color_code[code] + code + bcolors.ENDC
@@ -216,8 +253,10 @@ def main():
 
     print(f"Creating a map with {num_rows} rows and {num_columns} columns")
     
-    table = askQuestions(num_rows, num_columns)
+    table = askInitQuestions(num_rows, num_columns)
     drawGrid(table)
+    askPlacementQuestions(num_rows, num_columns)
+
 
 if __name__ == "__main__":
     main()
