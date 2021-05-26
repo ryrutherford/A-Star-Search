@@ -119,10 +119,10 @@ class Edge:
 class GridItem:
     def __init__(self, uintValue, row, column):
         self._value = uintValue
-        self._top_left = Point.instance(column, row)
-        self._top_right = Point.instance(column + 1, row)
-        self._bottom_left = Point.instance(column, row + 1)
-        self._bottom_right = Point.instance(column + 1, row + 1)
+        self._top_left = Point.instance(column*2, row)
+        self._top_right = Point.instance(column*2 + 2, row)
+        self._bottom_left = Point.instance(column*2, row + 1)
+        self._bottom_right = Point.instance(column*2 + 2, row + 1)
         self.initialize_edges()
     
     def get_points(self):
@@ -141,7 +141,7 @@ class GridItem:
         edge = Edge.instance(self._top_left, self._bottom_left)
         edge.add_score(self._value)
 
-def askInitQuestions(num_rows, num_cols):
+def ask_init_questions(num_rows, num_cols):
     table = np.zeros((num_rows, num_cols), dtype=object)
     for row in range(num_rows):
         for col in range(num_cols):
@@ -155,26 +155,25 @@ def askInitQuestions(num_rows, num_cols):
             table[row, col] = GridItem(location_to_uint_dict[answer["entry"]], row, col)
     return table
 
-def validStartingPoint(x, y, num_rows, num_cols):
+def valid_starting_point(x, y, num_rows, num_cols):
     try:
         x = float(x)
         y = float(y)
     except ValueError:
         print("ValueError, at least one of x or y was not a float or integer")
         return False
-    if x > num_cols or y > num_rows or x < 0 or y < 0:
+    if x > num_cols*2 or y > num_rows or x < 0 or y < 0:
         print(f"The coordinates ({x}, {y}) you entered are not in the grid! Please try again")
         return False
     return True
 
-def askPlacementQuestions(num_rows, num_cols):
-    print("You must enter values for the x and y coordinates of the start position")
+def get_x_and_y_coords(num_rows, num_cols, top_right_of_quarantine_places=None):
     while True:
         question = [
         {
             'type': 'input',
             'name': 'x',
-            'message': f'Enter a value for x (accepted range: [0 - {num_cols}])',
+            'message': f'Enter a value for x (accepted range: [0 - {num_cols*2}])',
         },
         {
             'type': 'input',
@@ -185,12 +184,33 @@ def askPlacementQuestions(num_rows, num_cols):
         answer = prompt(question)
         x = answer["x"]
         y = answer["y"]
-        if validStartingPoint(x, y, num_rows, num_cols):
+        if valid_starting_point(x, y, num_rows, num_cols):
             x = math.ceil(float(x))
+            if x % 2 != 0:
+                x = x + 1
+            #if x is = 0 we need to add 2 as otherwise we won't be at the top right of a grid
+            if x == 0:
+                x = x + 2
             y = math.floor(float(y))
-            break
-    print(f"Nice! Role C will be starting at point ({x},{y})")
+            #if y is = num_rows we need to subtract 1 since otherwise it won't be at the top right of a grid
+            if y == num_rows:
+                y = y - 1
+            if top_right_of_quarantine_places != None and Point.instance(x, y) not in top_right_of_quarantine_places:
+                print(f"The coordinates ({x}, {y}) you entered for the end point are not at the top right of a quarantine place! Please try again")
+            else:
+                break
+    
     return x, y
+
+def ask_placement_questions(num_rows, num_cols, top_right_of_quarantine_places):
+    print("You must enter values for the x and y coordinates of the start position")
+    start_x, start_y = get_x_and_y_coords(num_rows, num_cols)
+    print(f"Nice! Role C will be starting at point ({start_x},{start_y})")
+    print("You must enter values for the x and y coordinates of the end position")
+    end_x, end_y = get_x_and_y_coords(num_rows, num_cols, top_right_of_quarantine_places)
+    print(f"Nice! The ending point ({end_x},{end_y}) you entered is the top right of a quarantine place")
+    #we don't do anything with the endpoints so we just return the start points ¯\_(ツ)_/¯
+    return start_x, start_y
 
 def wrap_location_code_in_color(code):
     return location_code_to_color_code[code] + code + bcolors.ENDC
@@ -219,7 +239,7 @@ def drawVertical(halfPointLength, value, j, y, col):
         out += "|\n"
     return out
 
-def drawGrid(table):
+def draw_grid(table):
     row, col = table.shape
     out = ""
     for i in range(row):
@@ -238,6 +258,16 @@ def drawGrid(table):
                 out += drawHorizontal(bottom_left, bottom_right, j, col)
     print(out)
 
+#getting the top right points of each quarantine place in the map
+def get_top_right_of_quarantine_places(table):
+    row, col = table.shape
+    quarantine_places_top_right_list = []
+    for i in range(row):
+        for j in range(col):
+            if uint_to_location_code[table[i,j].get_value()] == QUARANTINE_CODE:
+                quarantine_places_top_right_list.append(table[i,j].get_points()[1])
+    return quarantine_places_top_right_list
+
 def main():
     parser = argparse.ArgumentParser(description='Covid-19 Map Simulation')
     parser.add_argument('num_rows', type=int, help='The number of rows')
@@ -249,13 +279,17 @@ def main():
     num_columns = args.num_columns
 
     if num_rows <= 0 or num_columns <= 0:
-        raise argparse.ArgumentTypeError("You cannot enter a negative value for num_rows or num_columns")
+        raise argparse.ArgumentTypeError("You cannot enter a negative or zero value for num_rows or num_columns")
 
     print(f"Creating a map with {num_rows} rows and {num_columns} columns")
     
-    table = askInitQuestions(num_rows, num_columns)
-    drawGrid(table)
-    askPlacementQuestions(num_rows, num_columns)
+    table = ask_init_questions(num_rows, num_columns)
+    draw_grid(table)
+    top_right_of_quarantine_places = get_top_right_of_quarantine_places(table)
+    if(top_right_of_quarantine_places == []):
+        print("The map you entered has no quarantine places! Exiting program")
+        exit()
+    ask_placement_questions(num_rows, num_columns, top_right_of_quarantine_places)
 
 
 if __name__ == "__main__":
