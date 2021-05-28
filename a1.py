@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import math
+import heapq
 from whaaaaat import prompt, print_json
 
 class bcolors:
@@ -91,9 +92,32 @@ class EdgeSingleton:
 class Point:
     def __init__(self, x, y):
         self._x, self._y = x, y
+        self._f_score = math.inf
+        self._g_score = math.inf
 
     def __str__(self):
         return "({}, {})".format(self._x, self._y)
+
+    def __lt__(self, other):
+        return self._f_score < other._f_score
+
+    def get_x(self):
+        return self._x
+    
+    def get_y(self):
+        return self._y
+    
+    def get_f_score(self):
+        return self._f_score
+    
+    def get_g_score(self):
+        return self._g_score
+    
+    def set_f_score(self, new_score):
+        self._f_score = new_score
+    
+    def set_g_score(self, new_score):
+        self._g_score = new_score
 
 @EdgeSingleton
 class Edge:
@@ -268,6 +292,61 @@ def get_top_right_of_quarantine_places(table):
                 quarantine_places_top_right_list.append(table[i,j].get_points()[1])
     return quarantine_places_top_right_list
 
+def get_neighbours_of_point(point, num_rows, num_cols):
+    x = point.get_x()
+    y = point.get_y()
+    neighbours = []
+    if x - 2 >= 0:
+        neighbours.append(Point.instance(x-2, y))
+    if y - 1 >= 0:
+        neighbours.append(Point.instance(x, y-1))
+    if y + 1 <= num_rows:
+        neighbours.append(Point.instance(x, y+1))
+    if x + 2 <= num_cols*2:
+        neighbours.append(Point.instance(x + 2, y))
+    return neighbours
+
+def reconstruct_path(came_from, current):
+    total_path = [current]
+    while str(current) in came_from.keys():
+        current = came_from[str(current)]
+        total_path.append(current)
+    total_path.reverse()
+    return total_path
+
+def a_star(start, goals, num_rows, num_cols):
+    open_set = [start]
+    heapq.heapify(open_set)
+    came_from = dict()
+
+    while len(open_set) > 0:
+        current = heapq.heappop(open_set)
+
+        if current in goals:
+            print(f"We have found the shortest path")
+            path = reconstruct_path(came_from, current)
+            for i in range(len(path)):
+                print(str(path[i]), end='')
+                if i != len(path) - 1:
+                    print('-->', end='')
+            print('')
+            return
+        
+        neighbours = get_neighbours_of_point(current, num_rows, num_cols)
+        for i in range(len(neighbours)):
+            neighbour = neighbours[i]
+            tentative_g_score = current.get_g_score() + Edge.instance(current, neighbour).get_score()
+            if tentative_g_score < neighbour.get_g_score():
+                came_from[str(neighbour)] = current
+                neighbour.set_g_score(tentative_g_score)
+                #this will need to be replaced with heuristic eventually
+                neighbour.set_f_score(tentative_g_score)
+                if neighbour not in open_set:
+                    heapq.heappush(open_set, neighbour)
+
+    print("No path was found :(")
+
+
 def main():
     parser = argparse.ArgumentParser(description='Covid-19 Map Simulation')
     parser.add_argument('num_rows', type=int, help='The number of rows')
@@ -289,7 +368,16 @@ def main():
     if(top_right_of_quarantine_places == []):
         print("The map you entered has no quarantine places! Exiting program")
         exit()
-    ask_placement_questions(num_rows, num_columns, top_right_of_quarantine_places)
+
+    #getting the point object that refers to the start point the user entered
+    start_x, start_y = ask_placement_questions(num_rows, num_columns, top_right_of_quarantine_places)
+    start_point = Point.instance(start_x, start_y)
+    # g_scores = initialize_g_and_f_scores(table, start_point)
+    # #when we implement the heuristic we will need to not do this
+    # f_scores = dict(g_scores)
+    start_point.set_f_score(0)
+    start_point.set_g_score(0)
+    a_star(start_point, top_right_of_quarantine_places, num_rows, num_columns)
 
 
 if __name__ == "__main__":
