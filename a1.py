@@ -2,18 +2,11 @@ import argparse
 import numpy as np
 import math
 import heapq
+from Colors import bcolors
+from Edge import Edge
+from Point import Point
+from GridItem import GridItem
 from whaaaaat import prompt, print_json
-
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
 PLAYGROUND = "Playground"
 VAX_SPOT = "Vaccination Spot"
@@ -34,137 +27,6 @@ location_code_to_color_code = dict([(QUARANTINE_CODE,bcolors.OKGREEN), (NOTHING_
 #maps the long form name of a location to its index in the above list as well as its edge score
 location_to_uint_dict = dict([(PLAYGROUND, 3), (VAX_SPOT, 2), (QUARANTINE, 0), (NOTHING, 1)])
 
-#Credit: Paul Manta https://stackoverflow.com/questions/31875/is-there-a-simple-elegant-way-to-define-singletons
-class PointSingleton:
-
-    _instance_dict = dict()
-    
-    def __init__(self, decorated):
-        self._decorated = decorated
-
-    def instance(self, x, y):
-        """
-        Returns the singleton instance. Upon its first call, it creates a
-        new instance of the decorated class and calls its `__init__` method.
-        On all subsequent calls, the already created instance is returned.
-        """
-        try:
-            return self._instance_dict[f"{str(x)},{str(y)}"]
-        except Exception:
-            self._instance_dict[f"{str(x)},{str(y)}"] = self._decorated(x, y)
-            return self._instance_dict[f"{str(x)},{str(y)}"]
-
-    def __call__(self, x, y):
-        raise TypeError('Singletons must be accessed through `instance()`.')
-
-    def __instancecheck__(self, inst):
-        return isinstance(inst, self._decorated)
-
-class EdgeSingleton:
-
-    _instance_dict = dict()
-    
-    def __init__(self, decorated):
-        self._decorated = decorated
-
-    def instance(self, x, y):
-        """
-        Returns the singleton instance. Upon its first call, it creates a
-        new instance of the decorated class and calls its `__init__` method.
-        On all subsequent calls, the already created instance is returned.
-        """
-        try:
-            return self._instance_dict[f"{str(x)},{str(y)}"]
-        except Exception:
-            try:
-                return self._instance_dict[f"{str(y)},{str(x)}"]
-            except Exception:
-                self._instance_dict[f"{str(x)},{str(y)}"] = self._decorated(x, y)
-                return self._instance_dict[f"{str(x)},{str(y)}"]
-
-    def __call__(self, x, y):
-        raise TypeError('Singletons must be accessed through `instance()`.')
-
-    def __instancecheck__(self, inst):
-        return isinstance(inst, self._decorated)
-
-@PointSingleton
-class Point:
-    def __init__(self, x, y):
-        self._x, self._y = x, y
-        self._f_score = math.inf
-        self._g_score = math.inf
-
-    def __str__(self):
-        return "({}, {})".format(self._x, self._y)
-
-    def __lt__(self, other):
-        return self._f_score < other._f_score
-
-    def get_x(self):
-        return self._x
-    
-    def get_y(self):
-        return self._y
-    
-    def get_f_score(self):
-        return self._f_score
-    
-    def get_g_score(self):
-        return self._g_score
-    
-    def set_f_score(self, new_score):
-        self._f_score = new_score
-    
-    def set_g_score(self, new_score):
-        self._g_score = new_score
-
-@EdgeSingleton
-class Edge:
-    def __init__(self, point1, point2):
-        self._point1, self._point2 = point2, point2
-        self._score = None
-    
-    def __str__(self):
-        return "{} <-> {}".format(self._point1, self._point2)
-
-    def add_score(self, scoreToAdd):
-        if self._score is None:
-            self._score = scoreToAdd
-        #two playgrounds next to each other --> edge value is infinity
-        elif self._score == 3 and scoreToAdd == 3:
-            self._score = math.inf
-        else:
-            self._score = (self._score + scoreToAdd)/2
-
-    def get_score(self):
-        return self._score
-
-class GridItem:
-    def __init__(self, uintValue, row, column):
-        self._value = uintValue
-        self._top_left = Point.instance(column*2, row)
-        self._top_right = Point.instance(column*2 + 2, row)
-        self._bottom_left = Point.instance(column*2, row + 1)
-        self._bottom_right = Point.instance(column*2 + 2, row + 1)
-        self.initialize_edges()
-    
-    def get_points(self):
-        return self._top_left, self._top_right, self._bottom_right, self._bottom_left
-    
-    def get_value(self):
-        return self._value
-
-    def initialize_edges(self):
-        edge = Edge.instance(self._top_left, self._top_right)
-        edge.add_score(self._value)
-        edge = Edge.instance(self._top_right, self._bottom_right)
-        edge.add_score(self._value)
-        edge = Edge.instance(self._bottom_right, self._bottom_left)
-        edge.add_score(self._value)
-        edge = Edge.instance(self._top_left, self._bottom_left)
-        edge.add_score(self._value)
-
 def ask_init_questions(num_rows, num_cols):
     table = np.zeros((num_rows, num_cols), dtype=object)
     for row in range(num_rows):
@@ -179,6 +41,7 @@ def ask_init_questions(num_rows, num_cols):
             table[row, col] = GridItem(location_to_uint_dict[answer["entry"]], row, col)
     return table
 
+#determines whether the point the user entered falls within the grid
 def valid_starting_point(x, y, num_rows, num_cols):
     try:
         x = float(x)
@@ -191,6 +54,7 @@ def valid_starting_point(x, y, num_rows, num_cols):
         return False
     return True
 
+#gets x and y coordinates from the user as input on the command line
 def get_x_and_y_coords(num_rows, num_cols, top_right_of_quarantine_places=None):
     while True:
         question = [
@@ -226,6 +90,7 @@ def get_x_and_y_coords(num_rows, num_cols, top_right_of_quarantine_places=None):
     
     return x, y
 
+#asks the user for the start and end points
 def ask_placement_questions(num_rows, num_cols, top_right_of_quarantine_places):
     print("You must enter values for the x and y coordinates of the start position")
     start_x, start_y = get_x_and_y_coords(num_rows, num_cols)
@@ -236,9 +101,11 @@ def ask_placement_questions(num_rows, num_cols, top_right_of_quarantine_places):
     #we don't do anything with the endpoints so we just return the start points ¯\_(ツ)_/¯
     return start_x, start_y
 
+#wraps location codes in colours for the command line interface
 def wrap_location_code_in_color(code):
     return location_code_to_color_code[code] + code + bcolors.ENDC
 
+#helper function used to draw the horizontal part of the grid
 def drawHorizontal(left_point, right_point, j, col):
     out = ""
     out += bcolors.OKCYAN + str(left_point) + bcolors.ENDC
@@ -248,6 +115,7 @@ def drawHorizontal(left_point, right_point, j, col):
         out += "\n"
     return out
 
+#helper function used to draw the vertical part of the grid
 def drawVertical(halfPointLength, value, j, y, col):
     out = ""
     for x in range(halfPointLength):
@@ -263,6 +131,7 @@ def drawVertical(halfPointLength, value, j, y, col):
         out += "|\n"
     return out
 
+#draws the grid based on the inputs of the user
 def draw_grid(table):
     row, col = table.shape
     out = ""
@@ -292,6 +161,7 @@ def get_top_right_of_quarantine_places(table):
                 quarantine_places_top_right_list.append(table[i,j].get_points()[1])
     return quarantine_places_top_right_list
 
+#returns a list of direct neighbours for the passed in point
 def get_neighbours_of_point(point, num_rows, num_cols):
     x = point.get_x()
     y = point.get_y()
@@ -306,6 +176,7 @@ def get_neighbours_of_point(point, num_rows, num_cols):
         neighbours.append(Point.instance(x + 2, y))
     return neighbours
 
+#reconstructs the path from the start point to the goal point
 def reconstruct_path(came_from, current):
     total_path = [current]
     while str(current) in came_from.keys():
@@ -314,6 +185,7 @@ def reconstruct_path(came_from, current):
     total_path.reverse()
     return total_path
 
+#performs the A* search
 def a_star(start, goals, num_rows, num_cols):
     open_set = [start]
     heapq.heapify(open_set)
@@ -346,7 +218,7 @@ def a_star(start, goals, num_rows, num_cols):
 
     print("No path was found :(")
 
-
+#calls all the necessary functions to initialize the grid, collect the start/end point and perform A* search
 def main():
     parser = argparse.ArgumentParser(description='Covid-19 Map Simulation')
     parser.add_argument('num_rows', type=int, help='The number of rows')
