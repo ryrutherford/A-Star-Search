@@ -1,5 +1,6 @@
 import math
 
+#Credit for Singleton structure: Paul Manta https://stackoverflow.com/questions/31875/is-there-a-simple-elegant-way-to-define-singletons
 class EdgeSingleton:
 
     _instance_dict = dict()
