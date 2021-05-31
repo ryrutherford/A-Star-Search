@@ -237,7 +237,7 @@ def a_star(start, goals, num_rows, num_cols):
                 if neighbour not in open_set:
                     heapq.heappush(open_set, neighbour)
 
-    print("No path was found :(")
+    print("No path is found. Please try again!")
 
 #calls all the necessary functions to initialize the grid, collect the start/end point and perform A* search
 def main():
