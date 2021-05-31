@@ -107,17 +107,29 @@ def wrap_location_code_in_color(code):
     return location_code_to_color_code[code] + code + bcolors.ENDC
 
 #helper function used to draw the horizontal part of the grid
-def drawHorizontal(left_point, right_point, j, col):
+def draw_horizontal(left_point, right_point, j, col):
     out = ""
-    out += bcolors.OKCYAN + str(left_point) + bcolors.ENDC
+    str_left_point = str(left_point)
+    if len(str_left_point) == 7:
+        str_left_point = str_left_point.replace(" ", "")
+    elif len(str_left_point) == 8:
+        str_left_point = str_left_point.replace("(", "")
+        str_left_point = str_left_point.replace(")", "")
+    out += bcolors.OKCYAN + str_left_point + bcolors.ENDC
     out += "--------"
     if j == col - 1:
-        out += bcolors.OKCYAN + str(right_point) + bcolors.ENDC
+        str_right_point = str(right_point)
+        if len(str_right_point) == 7:
+            str_right_point = str_right_point.replace(" ", "")
+        elif len(str_left_point) == 8:
+            str_right_point = str_right_point.replace("(", "")
+            str_right_point = str_right_point.replace(")", "")
+        out += bcolors.OKCYAN + str_right_point + bcolors.ENDC
         out += "\n"
     return out
 
 #helper function used to draw the vertical part of the grid
-def drawVertical(halfPointLength, value, j, y, col):
+def draw_vertical(halfPointLength, value, j, y, col):
     out = ""
     for x in range(halfPointLength):
         out += " "
@@ -140,16 +152,16 @@ def draw_grid(table):
         for j in range(col):
             gridItem = table[i,j]
             top_left, top_right, _, _ = gridItem.get_points()
-            out += drawHorizontal(top_left, top_right, j, col)
+            out += draw_horizontal(top_left, top_right, j, col)
         for y in range(3):
             for j in range(col):
                 gridItem = table[i,j]
-                out += drawVertical(len(str(top_left)) // 2, gridItem.get_value(), j, y, col)
+                out += draw_vertical(len(str(top_left)) // 2, gridItem.get_value(), j, y, col)
         if i == row - 1:
             for j in range(col):
                 gridItem = table[i,j]
                 _, _, bottom_right, bottom_left = gridItem.get_points()
-                out += drawHorizontal(bottom_left, bottom_right, j, col)
+                out += draw_horizontal(bottom_left, bottom_right, j, col)
     print(out)
 
 #getting the top right points of each quarantine place in the map
@@ -202,6 +214,14 @@ def reconstruct_path(came_from, current):
     total_path.reverse()
     return total_path
 
+def calculate_cost_of_path(path):
+    cost = 0
+    for i in range(len(path)):
+        if i != len(path) - 1:
+            edge_cost = Edge.instance(path[i], path[i+1]).get_score()
+            cost = cost + edge_cost
+    return cost
+
 #used to print the optimal path
 def print_path(path):
     for i in range(len(path)):
@@ -223,6 +243,7 @@ def a_star(start, goals, num_rows, num_cols):
             print(f"We have found the shortest path")
             path = reconstruct_path(came_from, current)
             print_path(path)
+            print(f"The cost of the path was {calculate_cost_of_path(path)}")
             return
         
         #iterating over the neighbours of the current point, updating the g and f scores if necessary
