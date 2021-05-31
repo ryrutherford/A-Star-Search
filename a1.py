@@ -27,6 +27,7 @@ location_code_to_color_code = dict([(QUARANTINE_CODE,bcolors.OKGREEN), (NOTHING_
 #maps the long form name of a location to its index in the above list as well as its edge score
 location_to_uint_dict = dict([(PLAYGROUND, 3), (VAX_SPOT, 2), (QUARANTINE, 0), (NOTHING, 1)])
 
+#asks the user what they want to populate each grid item with
 def ask_init_questions(num_rows, num_cols):
     table = np.zeros((num_rows, num_cols), dtype=object)
     for row in range(num_rows):
@@ -161,6 +162,22 @@ def get_top_right_of_quarantine_places(table):
                 quarantine_places_top_right_list.append(table[i,j].get_points()[1])
     return quarantine_places_top_right_list
 
+#calculates heuristic for the current point based on the locations of the destination (quarantine center)
+def calculate_heuristic(current, top_right_of_quarantine_places):
+    current_x = current.get_x()
+    current_y = current.get_y()
+    best_h = math.inf
+    for i in range(len(top_right_of_quarantine_places)):
+        valid_destination = top_right_of_quarantine_places[i]
+        #we use manhattan distance with each move costing 0.5
+        #we subtract 0.5 to account for the 0 costing edges that are possible with quarantine places
+        manhattan_distance = abs((current_x - valid_destination.get_x())/4) + abs((current_y - valid_destination.get_y())/2) - 0.5
+        if manhattan_distance <= 0:
+            return 0
+        elif manhattan_distance < best_h:
+            best_h = manhattan_distance
+    return best_h
+
 #returns a list of direct neighbours for the passed in point
 def get_neighbours_of_point(point, num_rows, num_cols):
     x = point.get_x()
@@ -185,6 +202,14 @@ def reconstruct_path(came_from, current):
     total_path.reverse()
     return total_path
 
+#used to print the optimal path
+def print_path(path):
+    for i in range(len(path)):
+        print(str(path[i]), end='')
+        if i != len(path) - 1:
+            print('-->', end='')
+    print('')
+
 #performs the A* search
 def a_star(start, goals, num_rows, num_cols):
     open_set = [start]
@@ -197,13 +222,10 @@ def a_star(start, goals, num_rows, num_cols):
         if current in goals:
             print(f"We have found the shortest path")
             path = reconstruct_path(came_from, current)
-            for i in range(len(path)):
-                print(str(path[i]), end='')
-                if i != len(path) - 1:
-                    print('-->', end='')
-            print('')
+            print_path(path)
             return
         
+        #iterating over the neighbours of the current point, updating the g and f scores if necessary
         neighbours = get_neighbours_of_point(current, num_rows, num_cols)
         for i in range(len(neighbours)):
             neighbour = neighbours[i]
@@ -211,8 +233,7 @@ def a_star(start, goals, num_rows, num_cols):
             if tentative_g_score < neighbour.get_g_score():
                 came_from[str(neighbour)] = current
                 neighbour.set_g_score(tentative_g_score)
-                #this will need to be replaced with heuristic eventually
-                neighbour.set_f_score(tentative_g_score)
+                neighbour.set_f_score(tentative_g_score + calculate_heuristic(neighbour, goals))
                 if neighbour not in open_set:
                     heapq.heappush(open_set, neighbour)
 
@@ -244,10 +265,7 @@ def main():
     #getting the point object that refers to the start point the user entered
     start_x, start_y = ask_placement_questions(num_rows, num_columns, top_right_of_quarantine_places)
     start_point = Point.instance(start_x, start_y)
-    # g_scores = initialize_g_and_f_scores(table, start_point)
-    # #when we implement the heuristic we will need to not do this
-    # f_scores = dict(g_scores)
-    start_point.set_f_score(0)
+    start_point.set_f_score(calculate_heuristic(start_point, top_right_of_quarantine_places))
     start_point.set_g_score(0)
     a_star(start_point, top_right_of_quarantine_places, num_rows, num_columns)
 
