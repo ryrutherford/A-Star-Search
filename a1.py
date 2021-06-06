@@ -240,10 +240,13 @@ def a_star(start, goals, num_rows, num_cols):
         current = heapq.heappop(open_set)
 
         if current in goals:
-            print(f"We have found the shortest path")
             path = reconstruct_path(came_from, current)
-            print_path(path)
-            print(f"The cost of the path was {calculate_cost_of_path(path)}")
+            if len(path) == 1:
+                print(f"You are already at the goal state, no path was found")
+            else:
+                print(f"We have found the shortest path")
+                print_path(path)
+                print(f"The cost of the path was {calculate_cost_of_path(path)}")
             return
         
         #iterating over the neighbours of the current point, updating the g and f scores if necessary
